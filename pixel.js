@@ -1,6 +1,4 @@
-// pixel postprocessor
-
-const { Jimp, ResizeStrategy } = require("jimp"); 			// npm install jimp
+const { Jimp, ResizeStrategy } = require("jimp"); // npm install jimp
 const { intToRGBA } = require("@jimp/utils");
 
 function get_rgb1(image, x, y) {
@@ -118,11 +116,31 @@ function sharpen_outline(image_in, subtleness, exp) {
 	return image_out;
 }
 
-async function run() {
+async function run(args) {
 
-	let img = (await Jimp.read("input.png")).resize({ h: 256 });
+	let img = (await Jimp.read(args["--img"])).resize({ h: args["--h"] });
 
 	sharpen_outline(stochastic_color_blobbing(img, 2, 256 * 256 * 40, 0.07), 0.075, 1.7).resize({ h: 256 * 8, mode: ResizeStrategy.NEAREST_NEIGHBOR }).write("output.png");
 }
 
-run();
+// parse commandline arguments
+const args_raw = process.argv.slice(2);
+const args = {};
+
+for (const arg of args_raw) {
+
+	if (arg.includes("=")) {
+
+		args[arg.substring(0, arg.indexOf("="))] = arg.substring(arg.indexOf("=") + 1);
+	}
+}
+
+// push default arguments
+if (!args["--img"])
+	args["--img"] = "input.png";
+
+args["--h"] = Number(args["--h"]);
+if (isNaN(args["--h"]))
+	args["--h"] = 256;
+
+run(args);
