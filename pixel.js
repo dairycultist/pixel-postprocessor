@@ -38,8 +38,8 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 
 	for (let i = 0; i < iterations; i++) {
 
-		const x = Math.floor(Math.random() * (image.bitmap.width - 0.01));
-		const y = Math.floor(Math.random() * (image.bitmap.height - 0.01));
+		const x = Math.floor(Math.random() * (image_in.bitmap.width - 0.01));
+		const y = Math.floor(Math.random() * (image_in.bitmap.height - 0.01));
 
 		const center_color = get_rgb1(image_out, x, y);
 
@@ -50,7 +50,7 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 		for (let dx = -kernel_size; dx <= kernel_size; dx++) {
 			for (let dy = -kernel_size; dy <= kernel_size; dy++) {
 			
-				if (x + dx < 0 || y + dy < 0 || x + dx >= image.bitmap.width || y + dy >= image.bitmap.height)
+				if (x + dx < 0 || y + dy < 0 || x + dx >= image_in.bitmap.width || y + dy >= image_in.bitmap.height)
 					continue;
 
 				const neighbor_color = get_rgb1(image_out, x + dx, y + dy);
@@ -78,8 +78,8 @@ function sharpen_outline(image_in, subtleness, exp) {
 
 	const image_out = image_in.clone();
 
-	for (let x = 1; x < image.bitmap.width - 1; x++) {
-		for (let y = 1; y < image.bitmap.height - 1; y++) {
+	for (let x = 1; x < image_in.bitmap.width - 1; x++) {
+		for (let y = 1; y < image_in.bitmap.height - 1; y++) {
 
 			// for every pixel surrounding this pixel it's significantly darker than, darken this pixel
 			const this_c = get_rgb1(image_in, x, y);
