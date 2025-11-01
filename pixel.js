@@ -189,15 +189,8 @@ function sharpen_outline(image_in) {
 	for (let x = 1; x < 255; x++) {
 		for (let y = 1; y < 255; y++) {
 
-			let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
-			let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
-
-			// // if this pixel is between two dramatically different colors, make this pixel black
-			// if (horizontal > 0.3 && vertical > 0.3)
-			// 	image_out.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
-
 			// for every pixel surrounding this pixel it's significantly darker than, darken this pixel
-			const factor = 0.1;
+			const factor = 0.08;
 
 			const this_c = get_rgb1(image_in, x, y);
 
@@ -211,9 +204,17 @@ function sharpen_outline(image_in) {
 
 					if (this_c[0] < that_c[0] - factor && this_c[1] < that_c[1] - factor && this_c[2] < that_c[2] - factor) {
 
-						const c = get_rgb1(image_in, x, y);
+						const c = get_rgb1(image_out, x, y);
 
-						image_out.setPixelColor(rgb1_to_hex(...[0, 0, 0]), x, y);
+						c[0] += that_c[0];
+						c[1] += that_c[1];
+						c[2] += that_c[2];
+
+						c[0] *= 0.4;
+						c[1] *= 0.4;
+						c[2] *= 0.4;
+
+						image_out.setPixelColor(rgb1_to_hex(...c), x, y);
 					}
 				}
 			}
