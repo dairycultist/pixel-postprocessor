@@ -46,10 +46,13 @@ function surface_change(image_in) {
 
 			if (!is_transparent(image_in, x, y)) {
 
+				// calculate delta color
 				let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
 				let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
 
-				image_out.setPixelColor(rgb1_to_hex(horizontal / 2 + 0.5, vertical / 2 + 0.5, 1), x, y);
+				let c = Math.pow(horizontal, 2) + Math.pow(vertical, 2);
+
+				image_out.setPixelColor(rgb1_to_hex(c, c, c), x, y);
 			}
 		}
 	}
@@ -102,7 +105,7 @@ async function run() {
 	let img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
 
 	img = stochastic_color_blobbing(img, 4, 256 * 256 * 10, 0.04);
-	// img = surface_change(img);
+	img = surface_change(img);
 	
 	await img.write("output.png");
 }
