@@ -47,8 +47,8 @@ function edge(image_in, threshold = 0.5) {
 			if (!is_transparent(image_in, x, y)) {
 
 				// calculate delta color
-				let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
-				let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
+				let horizontal = color_difference(get_rgb1(image_in, x, y), get_rgb1(image_in, x + 1, y));
+				let vertical = color_difference(get_rgb1(image_in, x, y), get_rgb1(image_in, x, y + 1));
 
 				let c = Math.sqrt(Math.pow(horizontal, 2) + Math.pow(vertical, 2));
 
@@ -186,8 +186,8 @@ async function run() {
 
 	let base_img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
 
-	let color_img = stochastic_color_blobbing(base_img, 4, 256 * 256 * 10, 0.04);
-	let border_img = thin(thin(edge(stochastic_color_blobbing(base_img, 4, 256 * 256 * 20, 0.24), 0.07)));
+	let color_img = stochastic_color_blobbing(base_img, 2, 256 * 256 * 40, 0.07);
+	let border_img = thin(thin(edge(color_img, 0.07)));
 
 	let final_img = color_img.clone();
 
