@@ -1,6 +1,6 @@
 // pixel postprocessor
 
-const { Jimp } = require("jimp"); 			// npm install jimp
+const { Jimp, ResizeStrategy } = require("jimp"); 			// npm install jimp
 const { intToRGBA } = require("@jimp/utils");
 
 function get_rgb1(image, x, y) {
@@ -8,11 +8,6 @@ function get_rgb1(image, x, y) {
 	let rgb = intToRGBA(image.getPixelColor(x, y));
 
 	return [rgb.r / 255.0, rgb.g / 255.0, rgb.b / 255.0];
-}
-
-function is_transparent(image, x, y) {
-
-	return intToRGBA(image.getPixelColor(x, y)).a == 0;
 }
 
 function color_difference(c1, c2) {
@@ -37,117 +32,14 @@ function rgb1_to_hex(r, g, b) {
 	return (((r << 16) | (g << 8) | b) * 256) + 255;
 }
 
-function edge(image_in, threshold = 0.5) {
-
-	const image_out = new Jimp({ width: 256, height: 256, color: 0x000000FF });
-
-	for (let x = 1; x < 255; x++) {
-		for (let y = 1; y < 255; y++) {
-
-			if (!is_transparent(image_in, x, y)) {
-
-				// calculate delta color
-				let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
-				let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
-
-				let c = Math.sqrt(Math.pow(horizontal, 2) + Math.pow(vertical, 2));
-
-				c = c > threshold ? 1 : 0;
-
-				image_out.setPixelColor(rgb1_to_hex(c, c, c), x, y);
-			}
-		}
-	}
-
-	return image_out;
-}
-
-function thin(image_in) {
-
-	const image_out = image_in.clone();
-
-	// https://homepages.inf.ed.ac.uk/rbf/HIPR2/thin.htm
-	const struct_elems = [
-		[
-			[  0,   0,   0],
-			[NaN,   1, NaN],
-			[  1,   1,   1],
-		],
-		[
-			[NaN,   0,   0],
-			[  1,   1,   0],
-			[NaN,   1, NaN],
-		],
-		[
-			[  1, NaN,   0],
-			[  1,   1,   0],
-			[  1, NaN,   0],
-		],
-		[
-			[NaN,   1, NaN],
-			[  1,   1,   0],
-			[NaN,   0,   0],
-		],
-		[
-			[  1,   1,   1],
-			[NaN,   1, NaN],
-			[  0,   0,   0],
-		],
-		[
-			[NaN,   1, NaN],
-			[  0,   1,   1],
-			[  0,   0, NaN],
-		],
-		[
-			[  0, NaN,   1],
-			[  0,   1,   1],
-			[  0, NaN,   1],
-		],
-		[
-			[  0,   0, NaN],
-			[  0,   1,   1],
-			[NaN,   1, NaN],
-		],
-	];
-
-	const matches = (struct_elem, x, y) => {
-
-		for (let row = 0; row < 3; row++) {
-			for (let col = 0; col < 3; col++) {
-
-				if (!isNaN(struct_elem[row][col])) {
-
-					if (struct_elem[row][col] != get_rgb1(image_out, x + col - 1, y + row - 1)[0])
-						return false;
-				}
-			}
-		}
-
-		return true;
-	};
-
-	for (const struct_elem of struct_elems) {
-
-		for (let x = 1; x < 255; x++) {
-			for (let y = 1; y < 255; y++) {
-			
-				if (matches(struct_elem, x, y))
-					image_out.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
-			}
-		}
-	}
-
-	return image_out;
-}
-
 function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction) {
 
 	const image_out = image_in.clone();
 
 	for (let i = 0; i < iterations; i++) {
 
-		const x = Math.floor(Math.random() * 255.99);
-		const y = Math.floor(Math.random() * 255.99);
+		const x = Math.floor(Math.random() * (image.bitmap.width - 0.01));
+		const y = Math.floor(Math.random() * (image.bitmap.height - 0.01));
 
 		const center_color = get_rgb1(image_out, x, y);
 
@@ -158,7 +50,7 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 		for (let dx = -kernel_size; dx <= kernel_size; dx++) {
 			for (let dy = -kernel_size; dy <= kernel_size; dy++) {
 			
-				if (x + dx < 0 || y + dy < 0 || x + dx > 255 || y + dy > 255)
+				if (x + dx < 0 || y + dy < 0 || x + dx >= image.bitmap.width || y + dy >= image.bitmap.height)
 					continue;
 
 				const neighbor_color = get_rgb1(image_out, x + dx, y + dy);
@@ -186,8 +78,8 @@ function sharpen_outline(image_in, subtleness, exp) {
 
 	const image_out = image_in.clone();
 
-	for (let x = 1; x < 255; x++) {
-		for (let y = 1; y < 255; y++) {
+	for (let x = 1; x < image.bitmap.width - 1; x++) {
+		for (let y = 1; y < image.bitmap.height - 1; y++) {
 
 			// for every pixel surrounding this pixel it's significantly darker than, darken this pixel
 			const this_c = get_rgb1(image_in, x, y);
@@ -228,23 +120,9 @@ function sharpen_outline(image_in, subtleness, exp) {
 
 async function run() {
 
-	let base_img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
+	let img = (await Jimp.read("input.png")).resize({ h: 256 });
 
-	let color_img = stochastic_color_blobbing(base_img, 2, 256 * 256 * 40, 0.07);
-
-	// let border_img = thin(thin(thin(thin(edge(deartifact(color_img, 0.2), 0.07)))));
-
-	let final_img = sharpen_outline(color_img, 0.075, 2);
-
-	// for (let x = 1; x < 255; x++) {
-	// 	for (let y = 1; y < 255; y++) {
-
-	// 		if (get_rgb1(border_img, x, y)[0] == 1)
-	// 			final_img.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
-	// 	}
-	// }
-	
-	await final_img.write("output.png");
+	sharpen_outline(stochastic_color_blobbing(img, 2, 256 * 256 * 40, 0.07), 0.075, 1.7).resize({ h: 256 * 8, mode: ResizeStrategy.NEAREST_NEIGHBOR }).write("output.png");
 }
 
 run();
