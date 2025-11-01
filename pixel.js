@@ -37,9 +37,9 @@ function rgb1_to_hex(r, g, b) {
 	return (((r << 16) | (g << 8) | b) * 256) + 255;
 }
 
-function surface_change(image_in) {
+function edge(image_in, threshold = 0.5) {
 
-	const image_out = new Jimp({ width: 256, height: 256, color: 0xFFFFFF00 });
+	const image_out = new Jimp({ width: 256, height: 256, color: 0x000000FF });
 
 	for (let x = 1; x < 255; x++) {
 		for (let y = 1; y < 255; y++) {
@@ -50,7 +50,9 @@ function surface_change(image_in) {
 				let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
 				let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
 
-				let c = Math.pow(horizontal, 2) + Math.pow(vertical, 2);
+				let c = Math.sqrt(Math.pow(horizontal, 2) + Math.pow(vertical, 2));
+
+				c = c > threshold ? 1 : 0;
 
 				image_out.setPixelColor(rgb1_to_hex(c, c, c), x, y);
 			}
@@ -60,14 +62,94 @@ function surface_change(image_in) {
 	return image_out;
 }
 
+function thin(image_in) {
+
+	const image_out = image_in.clone();
+
+	// https://homepages.inf.ed.ac.uk/rbf/HIPR2/thin.htm
+	const struct_elems = [
+		[
+			[  0,   0,   0],
+			[NaN,   1, NaN],
+			[  1,   1,   1],
+		],
+		[
+			[NaN,   0,   0],
+			[  1,   1,   0],
+			[NaN,   1, NaN],
+		],
+		[
+			[  1, NaN,   0],
+			[  1,   1,   0],
+			[  1, NaN,   0],
+		],
+		[
+			[NaN,   1, NaN],
+			[  1,   1,   0],
+			[NaN,   0,   0],
+		],
+		[
+			[  1,   1,   1],
+			[NaN,   1, NaN],
+			[  0,   0,   0],
+		],
+		[
+			[NaN,   1, NaN],
+			[  0,   1,   1],
+			[  0,   0, NaN],
+		],
+		[
+			[  0, NaN,   1],
+			[  0,   1,   1],
+			[  0, NaN,   1],
+		],
+		[
+			[  0,   0, NaN],
+			[  0,   1,   1],
+			[NaN,   1, NaN],
+		],
+	];
+
+	const matches = (struct_elem, x, y) => {
+
+		for (let row = 0; row < 3; row++) {
+			for (let col = 0; col < 3; col++) {
+
+				if (!isNaN(struct_elem[row][col])) {
+
+					if (struct_elem[row][col] != get_rgb1(image_out, x + col - 1, y + row - 1)[0])
+						return false;
+				}
+			}
+		}
+
+		return true;
+	};
+
+	for (const struct_elem of struct_elems) {
+
+		for (let x = 1; x < 255; x++) {
+			for (let y = 1; y < 255; y++) {
+			
+				if (matches(struct_elem, x, y))
+					image_out.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
+			}
+		}
+	}
+
+	return image_out;
+}
+
 function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction) {
+
+	const image_out = image_in.clone();
 
 	for (let i = 0; i < iterations; i++) {
 
 		const x = Math.floor(Math.random() * 255.99);
 		const y = Math.floor(Math.random() * 255.99);
 
-		const center_color = get_rgb1(image_in, x, y);
+		const center_color = get_rgb1(image_out, x, y);
 
 		let sum_color = [0, 0, 0];
 		let count = 0;
@@ -79,7 +161,7 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 				if (x + dx < 0 || y + dy < 0 || x + dx > 255 || y + dy > 255)
 					continue;
 
-				const neighbor_color = get_rgb1(image_in, x + dx, y + dy);
+				const neighbor_color = get_rgb1(image_out, x + dx, y + dy);
 
 				if (color_difference(center_color, neighbor_color) < reduction) {
 					sum_color[0] += neighbor_color[0];
@@ -94,20 +176,30 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 		sum_color[1] /= count;
 		sum_color[2] /= count;
 
-		image_in.setPixelColor(rgb1_to_hex(...sum_color), x, y);
+		image_out.setPixelColor(rgb1_to_hex(...sum_color), x, y);
 	}
 
-	return image_in;
+	return image_out;
 }
 
 async function run() {
 
-	let img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
+	let base_img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
 
-	img = stochastic_color_blobbing(img, 4, 256 * 256 * 10, 0.04);
-	img = surface_change(img);
+	let color_img = stochastic_color_blobbing(base_img, 4, 256 * 256 * 10, 0.04);
+	let border_img = thin(thin(edge(stochastic_color_blobbing(base_img, 4, 256 * 256 * 20, 0.24), 0.07)));
+
+	let final_img = color_img.clone();
+
+	for (let x = 1; x < 255; x++) {
+		for (let y = 1; y < 255; y++) {
+
+			if (get_rgb1(border_img, x, y)[0] == 1)
+				final_img.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
+		}
+	}
 	
-	await img.write("output.png");
+	await final_img.write("output.png");
 }
 
 run();
