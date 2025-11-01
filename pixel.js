@@ -47,8 +47,8 @@ function edge(image_in, threshold = 0.5) {
 			if (!is_transparent(image_in, x, y)) {
 
 				// calculate delta color
-				let horizontal = color_difference(get_rgb1(image_in, x, y), get_rgb1(image_in, x + 1, y));
-				let vertical = color_difference(get_rgb1(image_in, x, y), get_rgb1(image_in, x, y + 1));
+				let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
+				let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
 
 				let c = Math.sqrt(Math.pow(horizontal, 2) + Math.pow(vertical, 2));
 
@@ -182,22 +182,64 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 	return image_out;
 }
 
+function sharpen_outline(image_in) {
+
+	const image_out = image_in.clone();
+
+	for (let x = 1; x < 255; x++) {
+		for (let y = 1; y < 255; y++) {
+
+			let horizontal = color_difference(get_rgb1(image_in, x - 1, y), get_rgb1(image_in, x + 1, y));
+			let vertical = color_difference(get_rgb1(image_in, x, y - 1), get_rgb1(image_in, x, y + 1));
+
+			// // if this pixel is between two dramatically different colors, make this pixel black
+			// if (horizontal > 0.3 && vertical > 0.3)
+			// 	image_out.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
+
+			// for every pixel surrounding this pixel it's significantly darker than, darken this pixel
+			const factor = 0.1;
+
+			const this_c = get_rgb1(image_in, x, y);
+
+			for (let dx = -1; dx <= 1; dx++) {
+				for (let dy = -1; dy <= 1; dy++) {
+					
+					if (dx == 0 && dy == 0)
+						continue;
+
+					const that_c = get_rgb1(image_in, x + dx, y + dy);
+
+					if (this_c[0] < that_c[0] - factor && this_c[1] < that_c[1] - factor && this_c[2] < that_c[2] - factor) {
+
+						const c = get_rgb1(image_in, x, y);
+
+						image_out.setPixelColor(rgb1_to_hex(...[0, 0, 0]), x, y);
+					}
+				}
+			}
+		}
+	}
+
+	return image_out;
+}
+
 async function run() {
 
 	let base_img = (await Jimp.read("input.png")).resize({ w: 256, h: 256 });
 
 	let color_img = stochastic_color_blobbing(base_img, 2, 256 * 256 * 40, 0.07);
-	let border_img = thin(thin(edge(color_img, 0.07)));
 
-	let final_img = color_img.clone();
+	// let border_img = thin(thin(thin(thin(edge(deartifact(color_img, 0.2), 0.07)))));
 
-	for (let x = 1; x < 255; x++) {
-		for (let y = 1; y < 255; y++) {
+	let final_img = sharpen_outline(color_img);
 
-			if (get_rgb1(border_img, x, y)[0] == 1)
-				final_img.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
-		}
-	}
+	// for (let x = 1; x < 255; x++) {
+	// 	for (let y = 1; y < 255; y++) {
+
+	// 		if (get_rgb1(border_img, x, y)[0] == 1)
+	// 			final_img.setPixelColor(rgb1_to_hex(0, 0, 0), x, y);
+	// 	}
+	// }
 	
 	await final_img.write("output.png");
 }
