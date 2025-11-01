@@ -182,7 +182,7 @@ function stochastic_color_blobbing(image_in, kernel_size, iterations, reduction)
 	return image_out;
 }
 
-function sharpen_outline(image_in) {
+function sharpen_outline(image_in, subtleness, exp) {
 
 	const image_out = image_in.clone();
 
@@ -190,8 +190,6 @@ function sharpen_outline(image_in) {
 		for (let y = 1; y < 255; y++) {
 
 			// for every pixel surrounding this pixel it's significantly darker than, darken this pixel
-			const factor = 0.08;
-
 			const this_c = get_rgb1(image_in, x, y);
 
 			for (let dx = -1; dx <= 1; dx++) {
@@ -202,7 +200,7 @@ function sharpen_outline(image_in) {
 
 					const that_c = get_rgb1(image_in, x + dx, y + dy);
 
-					if (this_c[0] < that_c[0] - factor && this_c[1] < that_c[1] - factor && this_c[2] < that_c[2] - factor) {
+					if (this_c[0] < that_c[0] - subtleness && this_c[1] < that_c[1] - subtleness && this_c[2] < that_c[2] - subtleness) {
 
 						const c = get_rgb1(image_out, x, y);
 
@@ -210,9 +208,13 @@ function sharpen_outline(image_in) {
 						c[1] += that_c[1];
 						c[2] += that_c[2];
 
-						c[0] *= 0.4;
-						c[1] *= 0.4;
-						c[2] *= 0.4;
+						c[0] /= 2;
+						c[1] /= 2;
+						c[2] /= 2;
+
+						c[0] = Math.pow(c[0], exp);
+						c[1] = Math.pow(c[1], exp);
+						c[2] = Math.pow(c[2], exp);
 
 						image_out.setPixelColor(rgb1_to_hex(...c), x, y);
 					}
@@ -232,7 +234,7 @@ async function run() {
 
 	// let border_img = thin(thin(thin(thin(edge(deartifact(color_img, 0.2), 0.07)))));
 
-	let final_img = sharpen_outline(color_img);
+	let final_img = sharpen_outline(color_img, 0.075, 2);
 
 	// for (let x = 1; x < 255; x++) {
 	// 	for (let y = 1; y < 255; y++) {
